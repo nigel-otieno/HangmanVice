@@ -1,103 +1,173 @@
-import Image from "next/image";
+'use client'
+
+import { useEffect, useState } from 'react'
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [difficulty, setDifficulty] = useState('')
+  const [word, setWord] = useState('')
+  const [guessedLetters, setGuessedLetters] = useState([])
+  const [wrongGuesses, setWrongGuesses] = useState(0)
+  const [hintUsed, setHintUsed] = useState(false)
+  const [maxWrong, setMaxWrong] = useState(6)
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const fetchWords = async (count = 50) => {
+    const res = await fetch(`https://random-word-api.herokuapp.com/word?number=${count}`)
+    const data = await res.json()
+    return data
+  }
+
+  const filterByDifficulty = (words, level) => {
+    if (level === 'easy') return words.filter(w => w.length <= 4)
+    if (level === 'medium') return words.filter(w => w.length >= 5 && w.length <= 6)
+    return words.filter(w => w.length >= 7)
+  }
+
+  const initializeGame = async (level) => {
+    setDifficulty(level)
+
+    if (level === 'easy') setMaxWrong(10)
+    else if (level === 'medium') setMaxWrong(7)
+    else if (level === 'hard') setMaxWrong(4)
+
+    const allWords = await fetchWords(100)
+    const filtered = filterByDifficulty(allWords, level)
+    const random = filtered[Math.floor(Math.random() * filtered.length)] || 'hangman'
+
+    setWord(random.toLowerCase())
+    setGuessedLetters([])
+    setWrongGuesses(0)
+    setHintUsed(false)
+  }
+
+  const handleGuess = (letter) => {
+    if (guessedLetters.includes(letter)) return
+    setGuessedLetters((prev) => [...prev, letter])
+    if (!word.includes(letter)) {
+      setWrongGuesses((prev) => prev + 1)
+    }
+  }
+
+  const handleHint = () => {
+    if (hintUsed || wrongGuesses >= maxWrong) return
+    const remainingLetters = word.split('').filter((l) => !guessedLetters.includes(l))
+    if (remainingLetters.length === 0) return
+    const randomLetter = remainingLetters[Math.floor(Math.random() * remainingLetters.length)]
+    handleGuess(randomLetter)
+    setHintUsed(true)
+  }
+
+  const isWinner = word && word.split('').every((l) => guessedLetters.includes(l))
+  const isLoser = wrongGuesses >= maxWrong
+
+  const displayWord = word
+    .split('')
+    .map((letter) => (guessedLetters.includes(letter) ? letter : '_'))
+    .join(' ')
+
+  const keyboard = 'abcdefghijklmnopqrstuvwxyz'.split('').map((letter) => (
+    <button
+      key={letter}
+      onClick={() => handleGuess(letter)}
+      disabled={guessedLetters.includes(letter) || isWinner || isLoser}
+      className="m-1 px-3 py-2 bg-[#111827] text-white font-bold border border-cyan-500 rounded shadow-md
+                 hover:bg-cyan-600 hover:text-white hover:shadow-cyan-400/40 transition-all duration-200
+                 disabled:opacity-30 disabled:cursor-not-allowed"
+    >
+      {letter}
+    </button>
+  ))
+
+  return (
+    <main className="min-h-screen flex flex-col items-center justify-center text-white p-4 font-retro
+      bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-[length:200%_200%] animate-gradient-x transition-all duration-500">
+      
+      <h1 className="text-5xl font-extrabold mb-6 drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">
+        🌴 Hangman Vice 🎮
+      </h1>
+
+      {!difficulty && (
+        <div className="mb-6">
+          <p className="text-lg mb-2">Select Difficulty:</p>
+          {['easy', 'medium', 'hard'].map((level) => (
+            <button
+              key={level}
+              onClick={() => initializeGame(level)}
+              className="mx-2 px-4 py-2 border-2 border-white text-white rounded shadow-md hover:bg-white hover:text-black transition duration-200"
+            >
+              {level.charAt(0).toUpperCase() + level.slice(1)}
+            </button>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+      )}
+
+      {difficulty && (
+        <>
+          <svg viewBox="0 0 200 250" className="w-40 h-64 mb-6 stroke-white">
+            <style>
+              {`.fade-in { opacity: 0; animation: fade 0.5s ease-out forwards; }
+                @keyframes fade { to { opacity: 1; } }`}
+            </style>
+            <line x1="20" y1="240" x2="180" y2="240" strokeWidth="4" />
+            <line x1="60" y1="240" x2="60" y2="20" strokeWidth="4" />
+            <line x1="60" y1="20" x2="130" y2="20" strokeWidth="4" />
+            <line x1="130" y1="20" x2="130" y2="50" strokeWidth="4" />
+            {wrongGuesses > 0 && (
+              <circle cx="130" cy="70" r="20" strokeWidth="4" fill="none" className="fade-in" />
+            )}
+            {wrongGuesses > 1 && (
+              <line x1="130" y1="90" x2="130" y2="150" strokeWidth="4" className="fade-in" />
+            )}
+            {wrongGuesses > 2 && (
+              <line x1="130" y1="110" x2="100" y2="130" strokeWidth="4" className="fade-in" />
+            )}
+            {wrongGuesses > 3 && (
+              <line x1="130" y1="110" x2="160" y2="130" strokeWidth="4" className="fade-in" />
+            )}
+            {wrongGuesses > 4 && (
+              <line x1="130" y1="150" x2="100" y2="190" strokeWidth="4" className="fade-in" />
+            )}
+            {wrongGuesses > 5 && (
+              <line x1="130" y1="150" x2="160" y2="190" strokeWidth="4" className="fade-in" />
+            )}
+          </svg>
+
+          <p className="text-2xl tracking-widest mb-4">{displayWord}</p>
+
+          <button
+            onClick={handleHint}
+            disabled={hintUsed || isWinner || isLoser}
+            className="mb-4 px-3 py-1 border border-cyan-400 text-cyan-300 rounded hover:bg-cyan-200 hover:text-black disabled:opacity-30 transition"
+          >
+            {hintUsed ? 'Hint Used' : 'Use Hint'}
+          </button>
+
+          <div className="flex flex-wrap justify-center max-w-xl mb-2">
+            {keyboard}
+          </div>
+
+          <p className="text-md mb-6">Wrong guesses: {wrongGuesses} / {maxWrong}</p>
+
+          {(isWinner || isLoser) && (
+            <div className="mt-4 text-center space-y-2">
+              <h2 className="text-2xl font-bold">
+                {isWinner ? '🏆 Righteous Win!' : `💀 Game Over, dude! Word was: ${word}`}
+              </h2>
+              <button
+                className="px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white rounded"
+                onClick={() => initializeGame(difficulty)}
+              >
+                Play Again
+              </button>
+              <button
+                className="ml-2 px-4 py-2 bg-gray-200 text-black rounded"
+                onClick={() => setDifficulty('')}
+              >
+                Change Difficulty
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </main>
+  )
 }
